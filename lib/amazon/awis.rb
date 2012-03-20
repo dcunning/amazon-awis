@@ -28,7 +28,7 @@ require "digest/sha1"
 require "uri"
 require "net/https"
 require "time"
-require "hpricot"
+require "nokogiri"
 
 module Amazon
   
@@ -68,8 +68,9 @@ module Amazon
     	    yield @@options
     end
     
-    def self.get_info(domain)    
-    	    url = self.prepare_url(domain)
+    def self.get_info(domain, options = {})    
+    	    options = {:action => @@options[:action], :responsegroup => @@options[:responsegroup]}.merge(options)
+    	    url = self.prepare_url(domain, options)
     	    log "Request URL: #{url}"
     	    res = Net::HTTP.get_response(url)
     	    unless res.kind_of? Net::HTTPSuccess
@@ -84,10 +85,10 @@ module Amazon
     class Response
       # XML input is in string format
       def initialize(xml)
-      	      @doc = Hpricot(xml)
+      	      @doc = Nokogiri::HTML(xml)
       end
 
-      # Return Hpricot object.
+      # Return Nokogiri document.
       def doc
       	      @doc
       end      
@@ -109,18 +110,22 @@ module Amazon
       
       # Return error message.
       def is_success?
-      	      (@doc/"aws:statuscode").innerHTML == "Success"     	      	      
+        @doc.css('statuscode').inner_text == "Success"
+      end
+      
+      def result node_name
+        @doc.css(node_name).inner_text
       end
       
       #returns inner html of any tag in awis response i.e resp.rank => 3
       def method_missing(methodId)
-      	      txt = (@doc/"aws:#{methodId.id2name}").innerHTML
-      	      if txt.empty?
-      	      	      raise NoMethodError 		      
-      	      else
-      	      	      txt
-      	      end	      
-      end	                  
+        txt = @doc.css(methodId.id2name).inner_text
+        if txt.empty?
+          raise NoMethodError
+        else
+          txt
+        end
+      end
             
     end
     
@@ -144,11 +149,11 @@ module Amazon
       query.to_a.collect { |item| item.first + '=' + CGI::escape(item.last.to_s) }.join('&')
     end
     
-    def self.prepare_url(domain)
+    def self.prepare_url(domain, options = {})
       query = {
         'AWSAccessKeyId'   => self.options[:aws_access_key_id],
-        'Action'           => self.options[:action],
-        'ResponseGroup'    => self.options[:responsegroup],
+        'Action'           => options[:action] || self.options[:action],
+        'ResponseGroup'    => options[:responsegroup] || self.options[:responsegroup],
         'SignatureMethod'  => 'HmacSHA1',
         'SignatureVersion' => 2,
         'Timestamp'        => Time.now.utc.iso8601,
@@ -232,7 +237,7 @@ module Amazon
           return unless element
       
           result = element/path
-          if (result.is_a? Hpricot::Elements) || (result.is_a? Array)
+          if result.is_a? Array
           	  parsed_result = []
           	  result.each {|item|
           	  	  parsed_result << Element.get(item)

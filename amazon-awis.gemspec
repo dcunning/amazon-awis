@@ -38,12 +38,12 @@ Gem::Specification.new do |s|
     s.specification_version = 3
 
     if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
-      s.add_runtime_dependency(%q<hpricot>, [">= 0.4"])
+      s.add_runtime_dependency("nokogiri")
     else
-      s.add_dependency(%q<hpricot>, [">= 0.4"])
+      s.add_dependency("nokogiri")
     end
   else
-    s.add_dependency(%q<hpricot>, [">= 0.4"])
+    s.add_dependency("nokogiri")
   end
 end
 
